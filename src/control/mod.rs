@@ -8,55 +8,85 @@ use core::time::Duration;
 
 pub mod pid;
 
-/// A trait for implementing feedback control of a system.
+/// A trait for implementing a Controller for a System
 ///
-/// Feedback controllers are algorithms that attempt to reach a desired state (setpoint) by:
+/// Controllers are algorithms that attempt to reach a desired state (setpoint) by using logic
+/// determined by the designer to bring a System towards the desired state.
 ///
-/// 1. Measuring the difference (error) between the current and the desired state.
-/// 2. Computing corrective control signals that drive the system toward the desired setpoint
-///    to minimize error in the system.
-/// 3. Continuously adjusting based on new measurements of the system.
+/// There are typically 2 designs used to control a system;
+/// # Closed-loop Design
+/// Otherwise known as Feedback Control, this design uses a measured state to determine what
+/// the future input should be to bring the System to the desired state.
 ///
-/// This is a form of "closed-loop" control, which refers to how the controller forms a loop
-/// by continuously measuring the system's state and "feeding" the measurement back into the
-/// controller to adjust for a new, more desirable measurement that minimizes on error.
-///
-/// # Example
-///
-/// Simple P (proportional only) controller:
+/// An example of a Simple P (proportional only) Feedback controller:
 ///
 /// ```
 /// use core::time::Duration;
 ///
-/// struct ProportionalController {
+/// struct FeedbackController {
+///     setpoint: f64,
 ///     gain: f64,
 /// }
 ///
-/// impl Feedback for ProportionalController {
-///     type Error = f64;
+/// impl Controller for FeedbackController {
 ///     type Output = f64;
+///     type Input = f64;
 ///
-///     fn update(&mut self, error: Self::Error, _dt: Duration) -> Self::Output {
-///         self.gain * error
+///     fn update(&mut self, measured: Self::Output, _dt: Duration) -> Self::Output {
+///         self.gain * (self.setpoint - self.measured)
+///     }
+///
+///     fn set_desired(&mut self, setpoint: Self::Output) {
+///         self.setpoint = setpoint;
 ///     }
 /// }
 /// ```
-pub trait Feedback {
-    /// The controller's input (error) type.
+///
+/// # Open-loop Design
+/// Otherwise known as Feed-forward Control, this design instead determines the System Input
+/// purely from the desired state.
+///
+/// An example of a Simple Feedforward controller:
+///
+/// ```
+/// use core::time::Duration;
+///
+/// struct FeedforwardController {
+///     setpoint: f64,
+///     gain: f64,
+/// }
+///
+/// impl Feedback for FeedforwardController {
+///     type Error = f64;
+///     type Output = f64;
+///
+///     fn update(&mut self, _measured: Self::Error, _dt: Duration) -> Self::Output {
+///         self.gain * self.setpoint
+///     }
+///
+///     fn set_desired(&mut self, setpoint: Self::Output) {
+///         self.setpoint = setpoint;
+///     }
+/// }
+/// ```
+pub trait Controller {
+    /// The controller's input type
     ///
-    /// Error describes the difference between the setpoint and a measurement ("process value")
-    /// of the system.
-    type Error;
-
-    /// The controller's output type.
-    ///
-    /// This is commonly known as a "control signal", and is a value that will ideally decrease
-    /// the error of the system after being applied.
+    /// The output is whatever can be "measured" about your system. For example, this could be the velocity
+    /// of a Motor, or the global position on a field.
     type Output;
 
-    /// Computes a new control signal given a new error measurement.
+    /// The controller's input type.
+    ///
+    /// The input is whatever values control the behaviour of your system.
+    type Input;
+
+    /// Computes a new control signal given a new system measurement.
     ///
     /// This function also requires a `dt` ("delta time") value to be passed, which informs the
     /// controller of the amount of time that has elapsed since the last control signal was computed.
-    fn update(&mut self, error: Self::Error, dt: Duration) -> Self::Output;
+    fn update(&mut self, measured: Self::Output, dt: Duration) -> Self::Input;
+
+    /// Updates the Controller's Target state.
+    fn set_desired(&mut self, setpoint: Self::Output);
 }
